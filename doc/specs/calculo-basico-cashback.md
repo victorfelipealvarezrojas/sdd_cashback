@@ -77,6 +77,8 @@ La fila de 0.01 / 1% ya cubre el contraejemplo de esta regla: una compra válida
 - El saldo de recompensas se identifica **solo por cliente** (sin distinción de moneda).
 - La acreditación del cashback debe ser **atómica** con el registro de la compra: si algo falla, no queda cashback acreditado sin compra, ni compra sin su cashback.
 
+**Decisión técnica** (tomada durante la implementación, pendiente de confirmación explícita del negocio): como "consultar el saldo de recompensas" queda fuera de alcance de esta feature, no existe ningún endpoint para observarlo. Se expone `saldoRecompensas` como campo adicional en la respuesta de `POST /api/compras` — es el resultado de la mutación (cuánto quedó acreditado tras esta compra), no una consulta separada del saldo.
+
 ### Regla 5: Debe limitar el cashback acumulado del cliente a un tope máximo mensual fijo de 100.00; una compra que exceda el tope solo acredita el remanente disponible hasta completarlo.
 
 > Nota de alcance: este tope no está en los 3 criterios de aceptación originales de la HU. Es una ampliación de alcance **confirmada explícitamente por el negocio** durante el descubrimiento, no una inferencia de la HU.

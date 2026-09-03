@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-// TODO: quitar allowEmptyShould cuando existan clases en cada capa;
 @DisplayName("Reglas de arquitectura hexagonal (Puertos y Adaptadores)")
 class ArchitectureTest {
 
@@ -38,7 +37,6 @@ class ArchitectureTest {
                     .that().resideInAPackage(BASE_PACKAGE + ".domain..")
                     .should().dependOnClassesThat().resideInAnyPackage("org.springframework..")
                     .because("el dominio debe ser Java puro, sin dependencias de framework")
-                    .allowEmptyShould(true)
                     .check(importedClasses);
         }
 
@@ -49,7 +47,6 @@ class ArchitectureTest {
                     .that().resideInAPackage(BASE_PACKAGE + ".domain..")
                     .should().dependOnClassesThat().resideInAnyPackage("jakarta.persistence..")
                     .because("las entidades JPA pertenecen a adapter/out/persistence, no al dominio")
-                    .allowEmptyShould(true)
                     .check(importedClasses);
         }
     }
@@ -69,9 +66,7 @@ class ArchitectureTest {
 
                     .whereLayer("Adapter").mayNotBeAccessedByAnyLayer()
                     .whereLayer("Application").mayOnlyBeAccessedByLayers("Adapter")
-                    .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Adapter")
-
-                    .allowEmptyShould(true);
+                    .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Adapter");
 
             regla.check(importedClasses);
         }

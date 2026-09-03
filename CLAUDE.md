@@ -22,6 +22,7 @@ Stack: spring-boot-starter-web, spring-boot-starter-data-jpa, spring-boot-starte
 BigDecimal para TODOS los valores monetarios. NUNCA float, double ni int.
 Siempre RoundingMode explícito. Cashback: RoundingMode.DOWN, escala 2.
 BigDecimal.valueOf() o new BigDecimal("...") — NUNCA new BigDecimal(double).
+Si una regla de negocio necesita comparar o limitar un monto (p. ej. un tope) antes de truncarlo, separa el cálculo "exacto" (sin escala fija) del truncamiento final en métodos distintos — no los combines en un solo paso, o la regla del tope terminará comparando contra un valor ya truncado.
 
 ### Java 25
 Records para value objects, sealed interfaces, pattern matching.
@@ -32,6 +33,7 @@ Solo inyección por constructor (nada de @Autowired en campos).
 @Valid en los request bodies. 201 al crear, 200 al consultar, 400 validación, 404 no encontrado.
 Excepciones de dominio para violaciones de reglas de negocio. Mapear a HTTP solo en el controller.
 Nunca tragar excepciones ni filtrar detalles de infraestructura.
+Un caso de uso que ejecuta más de una escritura de persistencia (p. ej. actualizar dos repositorios distintos) debe marcarse @Transactional — si no, una falla a mitad de camino puede dejar el estado inconsistente.
 
 ## Estructura del proyecto
 
