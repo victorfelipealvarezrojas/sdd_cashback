@@ -1,0 +1,502 @@
+openapi: 3.0.3
+
+info:
+  title: Cashback Rewards API
+  version: "1.0.0"
+  license:
+    name: Proprietary
+  description: |
+    API del microservicio de Cashback Rewards.
+
+    ## Convenciones de esta especificación
+
+    - **Valores monetarios y tasas BigDecimal-safe**: todo campo que representa
+      dinero (`montoNeto`, `cashbackGanado`, `cashbackAcreditado`,
+      `totalCashback`, `saldoRecompensas`) o una tasa porcentual
+      (`tasaCashbackAplicada`) se serializa como **string**, no como `number`
+      JSON. Un `number` JSON puede perder precisión decimal al pasar por
+      parsers que lo convierten a `float`/`double` (JavaScript, por ejemplo);
+      como `string` con formato decimal fijo, el cliente puede parsearlo
+      directamente a `BigDecimal`/`Decimal` sin riesgo de redondeo. Los montos
+      de cashback y totales siempre tienen exactamente 2 decimales
+      (`RoundingMode.DOWN`, ver CLAUDE.md); `montoNeto` de entrada no tiene
+      escala fija porque llega ya calculado desde el servicio de compras.
+    - **Sin autenticación**: este microservicio no tiene `spring-security`.
+      `clienteId` se recibe como parámetro y se asume validado externamente;
+      restringir el acceso al detalle de otro cliente queda fuera de alcance
+      (Regla 6 de `detalle-y-total-cashback-mensual.md`).
+    - **Sin 404 por "cliente inexistente"**: el sistema no tiene un registro
+      de clientes independiente de sus compras, por lo que un `clienteId` sin
+      compras registradas responde `200` con detalle vacío y total `0.00`
+      (Regla 5), no `404`.
+
+servers:
+  - url: http://localhost:8080
+    description: Instancia local de desarrollo.
+
+security: []
+
+tags:
+  - name: Compras
+    description: Registro de compras y acreditación de cashback.
+  - name: Cashback Mensual
+    description: Consulta de detalle y total de cashback acreditado por mes calendario.
+
+paths:
+  /api/compras:
+    post:
+      tags: [Compras]
+      summary: Registrar una compra y acreditar su cashback
+      description: |
+        Calcula el cashback de la compra según la tasa del comercio, lo limita
+        al tope mensual disponible, lo trunca a 2 decimales y lo acredita al
+        saldo de recompensas del cliente de forma atómica con el registro de
+        la compra (ver `calculo-basico-cashback.md`).
+      operationId: registrarCompra
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompraRequest"
+            examples:
+              compraConCashback:
+                summary: Comercio con tasa configurada
+                value:
+                  clienteId: "cliente-1"
+                  comercioId: "comercio-a"
+                  montoNeto: "100.00"
+      responses:
+        "201":
+          description: Compra registrada y cashback acreditado (incluso si el cashback resultante es 0.00).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompraResponse"
+              examples:
+                cashbackAcreditado:
+                  summary: Comercio con tasa de 3%
+                  value:
+                    clienteId: "cliente-1"
+                    comercioId: "comercio-a"
+                    montoNeto: "100.00"
+                    cashbackGanado: "3.00"
+                    saldoRecompensas: "53.00"
+                sinTasaConfigurada:
+                  summary: Comercio sin tasa configurada
+                  value:
+                    clienteId: "cliente-1"
+                    comercioId: "comercio-sin-tasa"
+                    montoNeto: "50.00"
+                    cashbackGanado: "0.00"
+                    saldoRecompensas: "50.00"
+        "400":
+          description: Error de validación (p. ej. `clienteId`/`comercioId` vacíos, `montoNeto` ausente o no numérico).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                montoNetoAusente:
+                  value:
+                    type: "about:blank"
+                    title: "Bad Request"
+                    status: 400
+                    detail: "La solicitud no pasó la validación."
+                    instance: "/api/compras"
+                    errores:
+                      - campo: "montoNeto"
+                        mensaje: "no debe ser nulo"
+
+  /api/cashback/mensual:
+    get:
+      tags: [Cashback Mensual]
+      summary: Consultar el detalle y el total de cashback de un cliente en un mes
+      description: |
+        Devuelve, para el `clienteId` y el mes indicados, una línea por cada
+        compra registrada en ese mes calendario (incluidas las de cashback
+        `0.00`), ordenadas de la más antigua a la más reciente, junto con el
+        total acreditado del mes. El total se calcula sobre **todas** las
+        compras del mes, sin importar la página consultada (Regla 8).
+
+        Si se omite `mes`, se usa el mes calendario actual (Regla 7). El mes
+        de cada compra se determina con la zona horaria del servidor, el
+        mismo criterio que rige el reinicio del tope mensual (Regla 4).
+
+        Consultar un mes futuro es inválido y responde `400` en lugar de un
+        detalle vacío (Regla 5b).
+      operationId: consultarCashbackMensual
+      parameters:
+        - $ref: "#/components/parameters/ClienteId"
+        - $ref: "#/components/parameters/Mes"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+      responses:
+        "200":
+          description: Detalle y total del mes (vacío y 0.00 si el cliente no tiene compras ese mes).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CashbackMensualResponse"
+              examples:
+                conDetalle:
+                  summary: Dos compras en comercios con tasas distintas
+                  value:
+                    clienteId: "cliente-1"
+                    mes: "2026-01"
+                    totalCashback: "6.68"
+                    detalle:
+                      - compraId: "9f2b8e2a-1e3a-4b7a-9c1a-1a2b3c4d5e6f"
+                        fecha: "2026-01-05T10:15:00Z"
+                        comercioId: "comercio-a"
+                        montoNeto: "100.00"
+                        tasaCashbackAplicada: "2.00"
+                        cashbackAcreditado: "2.00"
+                        limitadoPorTope: false
+                      - compraId: "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+                        fecha: "2026-01-20T18:42:00Z"
+                        comercioId: "comercio-b"
+                        montoNeto: "200.00"
+                        tasaCashbackAplicada: "2.34"
+                        cashbackAcreditado: "4.68"
+                        limitadoPorTope: false
+                    paginacion:
+                      pagina: 0
+                      tamano: 20
+                      totalElementos: 2
+                      totalPaginas: 1
+                limitadoPorTope:
+                  summary: Compra limitada por el tope mensual
+                  value:
+                    clienteId: "cliente-2"
+                    mes: "2026-01"
+                    totalCashback: "100.00"
+                    detalle:
+                      - compraId: "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e"
+                        fecha: "2026-01-02T09:00:00Z"
+                        comercioId: "comercio-a"
+                        montoNeto: "4500.00"
+                        tasaCashbackAplicada: "2.00"
+                        cashbackAcreditado: "90.00"
+                        limitadoPorTope: false
+                      - compraId: "3c4d5e6f-7a8b-4c9d-0e1f-2a3b4c5d6e7f"
+                        fecha: "2026-01-10T12:30:00Z"
+                        comercioId: "comercio-b"
+                        montoNeto: "1000.00"
+                        tasaCashbackAplicada: "0.80"
+                        cashbackAcreditado: "8.00"
+                        limitadoPorTope: false
+                      - compraId: "4d5e6f7a-8b9c-4d0e-1f2a-3b4c5d6e7f8a"
+                        fecha: "2026-01-25T20:05:00Z"
+                        comercioId: "comercio-a"
+                        montoNeto: "350.00"
+                        tasaCashbackAplicada: "2.00"
+                        cashbackAcreditado: "2.00"
+                        limitadoPorTope: true
+                    paginacion:
+                      pagina: 0
+                      tamano: 20
+                      totalElementos: 3
+                      totalPaginas: 1
+                sinCompras:
+                  summary: Cliente sin compras en el mes consultado
+                  value:
+                    clienteId: "cliente-3"
+                    mes: "2026-02"
+                    totalCashback: "0.00"
+                    detalle: []
+                    paginacion:
+                      pagina: 0
+                      tamano: 20
+                      totalElementos: 0
+                      totalPaginas: 0
+        "400":
+          description: Parámetros inválidos — `mes` futuro, formato de `mes` inválido, `clienteId` ausente o `size` fuera de rango.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+              examples:
+                mesFuturo:
+                  summary: Mes posterior al mes calendario actual
+                  value:
+                    type: "about:blank"
+                    title: "Bad Request"
+                    status: 400
+                    detail: "No se puede consultar un mes futuro."
+                    instance: "/api/cashback/mensual"
+                    errores:
+                      - campo: "mes"
+                        mensaje: "no puede ser posterior al mes calendario actual"
+                formatoMesInvalido:
+                  summary: Formato de mes inválido
+                  value:
+                    type: "about:blank"
+                    title: "Bad Request"
+                    status: 400
+                    detail: "La solicitud no pasó la validación."
+                    instance: "/api/cashback/mensual"
+                    errores:
+                      - campo: "mes"
+                        mensaje: "debe tener el formato YYYY-MM"
+
+components:
+  parameters:
+    ClienteId:
+      name: clienteId
+      in: query
+      required: true
+      description: |
+        Identificador del cliente cuyo cashback se consulta. Se asume
+        validado externamente; esta API no restringe el acceso al detalle de
+        otro cliente (Regla 6).
+      schema:
+        type: string
+        minLength: 1
+      example: "cliente-1"
+
+    Mes:
+      name: mes
+      in: query
+      required: false
+      description: |
+        Mes calendario a consultar, formato `YYYY-MM`. Si se omite, se usa el
+        mes calendario actual (Regla 7). Un mes futuro responde `400`
+        (Regla 5b).
+      schema:
+        $ref: "#/components/schemas/Mes"
+      example: "2026-01"
+
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Número de página del detalle, base 0. El total del mes no depende de la página consultada (Regla 8).
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        default: 0
+      example: 0
+
+    Size:
+      name: size
+      in: query
+      required: false
+      description: Tamaño de página del detalle. Por defecto 20, máximo permitido 100 (Regla 8).
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100
+        default: 20
+      example: 20
+
+  schemas:
+    ImporteDecimal:
+      type: string
+      description: |
+        Valor decimal serializado como string para preservar precisión
+        (BigDecimal-safe): nunca debe parsearse como `float`/`double`.
+        Sin escala fija — representa un monto ya calculado (p. ej. el monto
+        neto de una compra) tal como llega desde el sistema de origen.
+      pattern: '^\d+(\.\d+)?$'
+      example: "100.00"
+
+    ImporteMonetario:
+      type: string
+      description: |
+        Monto monetario acreditado o total, serializado como string
+        (BigDecimal-safe), siempre con 2 decimales exactos
+        (`RoundingMode.DOWN`).
+      pattern: '^\d+\.\d{2}$'
+      example: "6.68"
+
+    TasaCashback:
+      type: string
+      description: |
+        Tasa de cashback del comercio, como porcentaje con hasta 2 decimales
+        (p. ej. `"2.34"` = 2.34%), serializada como string (BigDecimal-safe).
+      pattern: '^\d{1,3}(\.\d{1,2})?$'
+      example: "2.34"
+
+    Mes:
+      type: string
+      description: Mes calendario en formato `YYYY-MM`.
+      pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+      example: "2026-01"
+
+    CompraRequest:
+      type: object
+      required: [clienteId, comercioId, montoNeto]
+      properties:
+        clienteId:
+          type: string
+          minLength: 1
+          example: "cliente-1"
+        comercioId:
+          type: string
+          minLength: 1
+          example: "comercio-a"
+        montoNeto:
+          allOf:
+            - $ref: "#/components/schemas/ImporteDecimal"
+          description: |
+            Monto neto de la compra (monto menos descuentos, antes de
+            impuestos), ya calculado y validado por el servicio de compras.
+
+    CompraResponse:
+      type: object
+      required: [clienteId, comercioId, montoNeto, cashbackGanado, saldoRecompensas]
+      properties:
+        clienteId:
+          type: string
+          example: "cliente-1"
+        comercioId:
+          type: string
+          example: "comercio-a"
+        montoNeto:
+          $ref: "#/components/schemas/ImporteDecimal"
+        cashbackGanado:
+          allOf:
+            - $ref: "#/components/schemas/ImporteMonetario"
+          description: Cashback acreditado en esta compra (ya truncado y limitado por el tope mensual).
+        saldoRecompensas:
+          allOf:
+            - $ref: "#/components/schemas/ImporteMonetario"
+          description: Saldo de recompensas del cliente después de acreditar esta compra.
+
+    CashbackDetalleItem:
+      type: object
+      required:
+        - compraId
+        - fecha
+        - comercioId
+        - montoNeto
+        - tasaCashbackAplicada
+        - cashbackAcreditado
+        - limitadoPorTope
+      properties:
+        compraId:
+          type: string
+          format: uuid
+          description: Identificador de la compra que originó esta línea.
+          example: "9f2b8e2a-1e3a-4b7a-9c1a-1a2b3c4d5e6f"
+        fecha:
+          type: string
+          format: date-time
+          description: Fecha y hora de la compra, usada para el orden cronológico ascendente del detalle (Regla 1).
+          example: "2026-01-05T10:15:00Z"
+        comercioId:
+          type: string
+          example: "comercio-a"
+        montoNeto:
+          $ref: "#/components/schemas/ImporteDecimal"
+        tasaCashbackAplicada:
+          allOf:
+            - $ref: "#/components/schemas/TasaCashback"
+          description: |
+            Tasa efectivamente aplicada al momento de la compra (no la tasa
+            actual del comercio), para que el histórico no cambie si el
+            comercio ajusta su tasa después.
+        cashbackAcreditado:
+          allOf:
+            - $ref: "#/components/schemas/ImporteMonetario"
+          description: |
+            Cashback final acreditado (ya truncado y limitado por el tope).
+            Puede ser `0.00` por comercio sin tasa, truncamiento a cero, o
+            tope mensual alcanzado — el motivo no se distingue (Regla 2).
+        limitadoPorTope:
+          type: boolean
+          description: |
+            `true` cuando el cashback acreditado de esta compra fue menor al
+            que resultaría de `montoNeto × tasaCashbackAplicada` por haberse
+            alcanzado o excedido el tope mensual (Regla 1, contraejemplo).
+
+    Paginacion:
+      type: object
+      required: [pagina, tamano, totalElementos, totalPaginas]
+      properties:
+        pagina:
+          type: integer
+          format: int32
+          description: Página actual (base 0).
+          example: 0
+        tamano:
+          type: integer
+          format: int32
+          description: Tamaño de página usado.
+          example: 20
+        totalElementos:
+          type: integer
+          format: int64
+          description: Total de compras del mes, independiente de la paginación.
+          example: 2
+        totalPaginas:
+          type: integer
+          format: int32
+          example: 1
+
+    CashbackMensualResponse:
+      type: object
+      required: [clienteId, mes, totalCashback, detalle, paginacion]
+      properties:
+        clienteId:
+          type: string
+          example: "cliente-1"
+        mes:
+          $ref: "#/components/schemas/Mes"
+        totalCashback:
+          allOf:
+            - $ref: "#/components/schemas/ImporteMonetario"
+          description: |
+            Suma de los montos de cashback acreditados de todas las compras
+            del mes (incluidas las de `0.00`), calculada sobre el total del
+            mes sin importar la página consultada (Regla 3, Regla 8).
+        detalle:
+          type: array
+          description: Página del detalle de compras del mes, ordenado de la más antigua a la más reciente (Regla 1). Vacío si el cliente no tuvo compras ese mes (Regla 5).
+          items:
+            $ref: "#/components/schemas/CashbackDetalleItem"
+        paginacion:
+          $ref: "#/components/schemas/Paginacion"
+
+    ErrorCampo:
+      type: object
+      required: [campo, mensaje]
+      properties:
+        campo:
+          type: string
+          example: "montoNeto"
+        mensaje:
+          type: string
+          example: "no debe ser nulo"
+
+    ProblemDetail:
+      type: object
+      description: Formato de error RFC 7807, usado en todas las respuestas 400.
+      required: [title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          example: "about:blank"
+        title:
+          type: string
+          example: "Bad Request"
+        status:
+          type: integer
+          format: int32
+          example: 400
+        detail:
+          type: string
+          example: "La solicitud no pasó la validación."
+        instance:
+          type: string
+          format: uri-reference
+          example: "/api/compras"
+        errores:
+          type: array
+          description: Presente solo cuando el error incluye violaciones de campos específicos.
+          items:
+            $ref: "#/components/schemas/ErrorCampo"
