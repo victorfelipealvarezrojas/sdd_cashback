@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 public record CompraRequest(
         @NotBlank String clienteId,
         @NotBlank String comercioId,
-        @NotNull BigDecimal montoNeto
+        @NotNull BigDecimal montoNeto,
+        String categoriaComercio
 ) {
 }

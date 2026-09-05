@@ -42,7 +42,7 @@ class DetalleYTotalCashbackMensualAcceptanceIT {
             String mesActual = YearMonth.now().toString();
 
             registrarCompra(clienteId, "comercio-1", new BigDecimal("100.00"));
-            registrarCompra(clienteId, "comercio-2", new BigDecimal("200.00"));
+            registrarCompra(clienteId, "comercio-combustible", new BigDecimal("468.00"));
 
             MvcResult result = mockMvc.perform(get("/api/clientes/{clienteId}/cashback", clienteId)
                             .param("mes", mesActual))
@@ -63,9 +63,9 @@ class DetalleYTotalCashbackMensualAcceptanceIT {
             assertThat(primeraLinea.get("limitadoPorTope").asBoolean()).isFalse();
 
             JsonNode segundaLinea = detalle.get(1);
-            assertThat(segundaLinea.get("comercioId").asText()).isEqualTo("comercio-2");
-            assertThat(segundaLinea.get("montoNeto").decimalValue()).isEqualByComparingTo("200.00");
-            assertThat(segundaLinea.get("tasaCashback").decimalValue()).isEqualByComparingTo("2.34");
+            assertThat(segundaLinea.get("comercioId").asText()).isEqualTo("comercio-combustible");
+            assertThat(segundaLinea.get("montoNeto").decimalValue()).isEqualByComparingTo("468.00");
+            assertThat(segundaLinea.get("tasaCashback").decimalValue()).isEqualByComparingTo("1.00");
             assertThat(segundaLinea.get("cashbackGanado").decimalValue()).isEqualByComparingTo("4.68");
             assertThat(segundaLinea.get("limitadoPorTope").asBoolean()).isFalse();
         }
@@ -76,8 +76,8 @@ class DetalleYTotalCashbackMensualAcceptanceIT {
             String clienteId = "cliente-detalle-tope";
             String mesActual = YearMonth.now().toString();
 
-            registrarCompra(clienteId, "comercio-alto-cashback", new BigDecimal("970.00"));
-            registrarCompra(clienteId, "comercio-alto-cashback", new BigDecimal("80.00"));
+            registrarCompra(clienteId, "comercio-1", new BigDecimal("4850.00"));
+            registrarCompra(clienteId, "comercio-1", new BigDecimal("400.00"));
 
             MvcResult result = mockMvc.perform(get("/api/clientes/{clienteId}/cashback", clienteId)
                             .param("mes", mesActual))
@@ -95,8 +95,8 @@ class DetalleYTotalCashbackMensualAcceptanceIT {
             assertThat(compraSinLimite.get("limitadoPorTope").asBoolean()).isFalse();
 
             JsonNode compraLimitadaPorTope = detalle.get(1);
-            assertThat(compraLimitadaPorTope.get("montoNeto").decimalValue()).isEqualByComparingTo("80.00");
-            assertThat(compraLimitadaPorTope.get("tasaCashback").decimalValue()).isEqualByComparingTo("10.00");
+            assertThat(compraLimitadaPorTope.get("montoNeto").decimalValue()).isEqualByComparingTo("400.00");
+            assertThat(compraLimitadaPorTope.get("tasaCashback").decimalValue()).isEqualByComparingTo("2.00");
             assertThat(compraLimitadaPorTope.get("cashbackGanado").decimalValue())
                     .as("el cashback acreditado debe ser el remanente hasta el tope (3.00), no el exacto (8.00)")
                     .isEqualByComparingTo("3.00");

@@ -1,6 +1,7 @@
 package com.val.cashbank.acceptance;
 
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,7 @@ class CalculoBasicoCashbackIT {
 
     @Nested
     @DisplayName("Regla: no debe generar cashback en compras de comercios sin una tasa de cashback configurada. Un comercio se considera \"asociado\" si y solo si tiene una tasa configurada")
+    @Disabled("Regla superada por doc/specs/categorias-comerciante-y-elegibilidad.md (Regla 1): la tasa ya no se configura manualmente por comercio, y todo comercio tiene una tasa aplicable (mínimo 0.5%, categoría Por defecto); el concepto de \"comercio no asociado = 0.00\" ya no existe.")
     class ComercioSinTasaConfigurada {
 
         @Test
@@ -134,12 +136,12 @@ class CalculoBasicoCashbackIT {
     class TruncamientoDelCashback {
 
         @Test
-        @DisplayName("El caso en que el monto neto es 33.33 y la tasa de cashback del comercio es 3%, el cashback exacto 0.9999 se acredita truncado a 0.99")
+        @DisplayName("El caso en que el monto neto es 33.33 y la tasa de cashback del comercio es 2%, el cashback exacto 0.6666 se acredita truncado a 0.66")
         void cashbackConFraccionSeTruncaHaciaAbajo() throws Exception {
             String requestBody = """
                     {
                       "clienteId": "cliente-4",
-                      "comercioId": "comercio-tasa-3",
+                      "comercioId": "comercio-1",
                       "montoNeto": 33.33
                     }
                     """;
@@ -152,17 +154,17 @@ class CalculoBasicoCashbackIT {
 
             JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
 
-            assertThat(response.get("cashbackGanado").decimalValue()).isEqualByComparingTo("0.99");
+            assertThat(response.get("cashbackGanado").decimalValue()).isEqualByComparingTo("0.66");
         }
 
         @Test
-        @DisplayName("El caso en que el monto neto es 10.00 y la tasa de cashback del comercio es 7.5%, el cashback exacto 0.75 se acredita sin cambios")
+        @DisplayName("El caso en que el monto neto es 37.50 y la tasa de cashback del comercio es 2%, el cashback exacto 0.75 se acredita sin cambios")
         void cashbackExactoEnDosDecimalesNoCambiaAlTruncar() throws Exception {
             String requestBody = """
                     {
                       "clienteId": "cliente-5",
-                      "comercioId": "comercio-tasa-7-5",
-                      "montoNeto": 10.00
+                      "comercioId": "comercio-1",
+                      "montoNeto": 37.50
                     }
                     """;
 

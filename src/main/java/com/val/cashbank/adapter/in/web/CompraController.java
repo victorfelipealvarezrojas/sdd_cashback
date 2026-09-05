@@ -27,7 +27,8 @@ public class CompraController {
                 new RegistrarCompraUseCase.RegistrarCompraCommand(
                         request.clienteId(),
                         request.comercioId(),
-                        request.montoNeto()
+                        request.montoNeto(),
+                        request.categoriaComercio()
                 )
         );
 

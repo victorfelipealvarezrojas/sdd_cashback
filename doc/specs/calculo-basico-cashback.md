@@ -1,5 +1,14 @@
 # Cálculo básico de cashback
 
+> **Nota de actualización:** la Regla 1 y la Regla 2 de este documento fueron
+> **superadas** por `categorias-comerciante-y-elegibilidad.md`. La tasa de
+> cashback ya no se configura manualmente por comercio: depende de la
+> categoría del comercio (Supermercado 2%, Combustible 1%, Por defecto
+> 0.5%). El concepto de "comercio sin tasa configurada / no asociado = 0.00"
+> ya no existe — todo comercio tiene una tasa aplicable, mínimo 0.5% (Por
+> defecto). Se conserva el texto original de estas reglas por trazabilidad
+> histórica del Example Mapping, no como comportamiento vigente.
+
 ## Historia
 
 Como cliente, quiero ganar cashback en mis compras para ser recompensado por
@@ -39,12 +48,19 @@ Para cada compra, las reglas se aplican en este orden:
 
 La fila de tasa 100% cubre el contraejemplo de esta regla: el límite superior teórico, donde el cashback iguala el monto neto total de la compra.
 
+> **Nota de actualización:** la multiplicación `monto neto × tasa` sigue
+> vigente; lo que cambió (ver `categorias-comerciante-y-elegibilidad.md`,
+> Regla 1) es el **origen** de la tasa: ya no es una tasa configurada
+> manualmente por comercio, sino la tasa de la categoría del comercio. Las
+> tasas de esta tabla (2%, 2.34%, 100%) ya no corresponden a tasas
+> alcanzables — el máximo ahora es 2% (Supermercado).
+
 **Decisiones** (no está en los 3 criterios originales de la HU; ampliación confirmada explícitamente por el negocio):
 - La tasa se representa como porcentaje con hasta 2 decimales (p. ej. 2.34 = 2.34%), no como fracción decimal (0.0234). Se almacena y opera con `BigDecimal`, escala 2.
 - **Monto neto** = monto de la compra **menos descuentos**, **antes de impuestos**. El cashback se calcula sobre este valor, no sobre el precio de lista ni sobre el total con impuestos.
 - El monto neto llega ya calculado como dato de entrada desde el servicio/módulo de compras (externo a esta feature); esta feature no calcula descuentos ni impuestos, solo consume el monto neto recibido.
 
-### Regla 2: No debe generar cashback en compras de comercios sin una tasa de cashback configurada. Un comercio se considera "asociado" si y solo si tiene una tasa configurada.
+### Regla 2 (SUPERADA — ver nota de actualización): No debe generar cashback en compras de comercios sin una tasa de cashback configurada. Un comercio se considera "asociado" si y solo si tiene una tasa configurada.
 
 - Ejemplo: El caso en que el comercio "Comercio A" tiene una tasa configurada de 3% y el cliente compra por 100.00 → se calcula un cashback de 3.00.
 - Contraejemplo: El caso en que el comercio no tiene ninguna tasa de cashback configurada (no está asociado) → la compra no genera cashback, se calcula 0.00, **sin lanzar excepción**.

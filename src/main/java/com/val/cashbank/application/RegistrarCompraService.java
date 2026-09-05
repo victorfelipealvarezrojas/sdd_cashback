@@ -4,6 +4,7 @@ import com.val.cashbank.application.port.in.RegistrarCompraUseCase;
 import com.val.cashbank.application.port.out.ComercioRepository;
 import com.val.cashbank.application.port.out.SaldoRecompensasRepository;
 import com.val.cashbank.application.port.out.TransaccionCashbackRepository;
+import com.val.cashbank.domain.model.CategoriaComercio;
 import com.val.cashbank.domain.model.SaldoRecompensas;
 import com.val.cashbank.domain.model.TransaccionCashback;
 import com.val.cashbank.domain.service.CalculadoraCashback;
@@ -34,9 +35,12 @@ public class RegistrarCompraService implements RegistrarCompraUseCase {
     @Override
     @Transactional
     public RegistrarCompraResult registrarCompra(RegistrarCompraCommand comando) {
-        BigDecimal cashbackExacto = comercioRepository.buscarPorId(comando.comercioId())
-                .map(comercio -> calculadoraCashback.calcularExacto(comando.montoNeto(), comercio.tasaCashback()))
-                .orElse(BigDecimal.ZERO);
+        BigDecimal cashbackExacto = comando.categoriaComercio() != null
+                ? calculadoraCashback.calcularExacto(comando.montoNeto(),
+                        CategoriaComercio.desde(comando.categoriaComercio()).tasaCashback())
+                : comercioRepository.buscarPorId(comando.comercioId())
+                        .map(comercio -> calculadoraCashback.calcularExacto(comando.montoNeto(), comercio.tasaCashback()))
+                        .orElse(BigDecimal.ZERO);
 
         YearMonth mesActual = YearMonth.now();
         BigDecimal acumuladoDelMes = transaccionCashbackRepository.sumarCashbackAcreditadoDelMes(

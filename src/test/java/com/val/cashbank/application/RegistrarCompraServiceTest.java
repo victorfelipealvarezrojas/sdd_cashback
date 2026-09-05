@@ -8,6 +8,7 @@ import com.val.cashbank.application.port.out.TransaccionCashbackRepository;
 import com.val.cashbank.domain.model.Comercio;
 import com.val.cashbank.domain.model.SaldoRecompensas;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,7 @@ class RegistrarCompraServiceTest {
 
     @Nested
     @DisplayName("Regla: no debe generar cashback en compras de comercios sin una tasa de cashback configurada. Un comercio se considera \"asociado\" si y solo si tiene una tasa configurada")
+    @Disabled("Regla superada por doc/specs/categorias-comerciante-y-elegibilidad.md (Regla 1): la tasa ya no se configura manualmente por comercio, y todo comercio tiene una tasa aplicable (mínimo 0.5%, categoría Por defecto); el concepto de \"comercio no asociado = 0.00\" ya no existe.")
     class ComercioSinTasaConfigurada {
 
         @Test
@@ -147,6 +149,21 @@ class RegistrarCompraServiceTest {
                     new RegistrarCompraCommand("cliente-tope-3", "comercio-1", new BigDecimal("250.00")));
 
             assertThat(resultado.cashbackGanado()).isEqualByComparingTo("0.00");
+        }
+    }
+
+    @Nested
+    @DisplayName("Regla: debe calcular el cashback usando la tasa de la categoría (MCC) de la transacción: Supermercado 2%, Combustible 1%, Por defecto 0.5%")
+    class CalculoDeCashbackSegunCategoriaDeLaTransaccion {
+
+        @Test
+        @DisplayName("El caso en que la transacción tiene categoría Supermercado, el cashback usa la tasa de 2% sin consultar el comercio")
+        void transaccionCategoriaSupermercadoAplicaTasaDeDosPorCiento() {
+            RegistrarCompraResult resultado = registrarCompraService.registrarCompra(
+                    new RegistrarCompraCommand("cliente-categoria-1", "comercio-hipermercado",
+                            new BigDecimal("100.00"), "SUPERMERCADO"));
+
+            assertThat(resultado.cashbackGanado()).isEqualByComparingTo("2.00");
         }
     }
 }

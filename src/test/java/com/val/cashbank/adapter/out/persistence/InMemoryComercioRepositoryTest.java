@@ -1,6 +1,7 @@
 package com.val.cashbank.adapter.out.persistence;
 
 import com.val.cashbank.domain.model.Comercio;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ class InMemoryComercioRepositoryTest {
 
     @Nested
     @DisplayName("Regla: no debe generar cashback en compras de comercios sin una tasa de cashback configurada. Un comercio se considera \"asociado\" si y solo si tiene una tasa configurada")
+    @Disabled("Regla superada por doc/specs/categorias-comerciante-y-elegibilidad.md (Regla 1): la tasa ya no se configura manualmente por comercio, y todo comercio tiene una tasa aplicable (mínimo 0.5%, categoría Por defecto); el concepto de \"comercio no asociado = 0.00\" ya no existe.")
     class ComercioSinTasaConfigurada {
 
         @Test
@@ -52,6 +54,7 @@ class InMemoryComercioRepositoryTest {
 
     @Nested
     @DisplayName("Regla: debe truncar el cashback calculado a 2 decimales sin redondear hacia arriba (RoundingMode.DOWN)")
+    @Disabled("Fixtures comercio-tasa-3 (3%) y comercio-tasa-7-5 (7.5%) representaban tasas no alcanzables bajo el modelo de categorías (máx. 2%, ver doc/specs/categorias-comerciante-y-elegibilidad.md); además, esta clase solo verificaba la tasa configurada del fixture, no el truncamiento en sí, que ya cubre CalculadoraCashbackTest.")
     class TruncamientoDelCashback {
 
         @Test

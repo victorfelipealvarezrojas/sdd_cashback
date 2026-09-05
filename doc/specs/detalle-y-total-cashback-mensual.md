@@ -40,14 +40,23 @@ cada mes, para poder entender y confiar en cómo se calculan mis recompensas.
 **Decisiones (confirmadas explícitamente por el negocio):**
 - Se muestra únicamente el cashback **acreditado** (ya truncado y limitado por el tope); no se expone el cashback exacto sin truncar/sin tope como campo aparte.
 - Cuando una compra fue limitada por el tope mensual, se agrega un indicador explícito (p. ej. `limitadoPorTope: true`) en su línea del detalle.
-- La tasa mostrada es la que efectivamente se aplicó en el momento de la compra, no la tasa actual del comercio (evita que el detalle histórico cambie si el comercio ajusta su tasa después).
+- La tasa mostrada es la que efectivamente se aplicó en el momento de la compra, no la tasa actual del comercio (evita que el detalle histórico cambie si el comercio ajusta su tasa después). Con `categorias-comerciante-y-elegibilidad.md`, esto aplica igual si cambia la categoría del comercio: se conserva la tasa histórica de la categoría vigente al momento de la compra.
 - Orden del detalle: cronológico ascendente (de la compra más antigua a la más reciente dentro del mes).
 
-### Regla 2: Debe incluir en el detalle las compras cuyo cashback acreditado fue 0.00 (comercio sin tasa configurada, truncamiento a cero, o tope mensual ya alcanzado), sin omitirlas del listado.
+### Regla 2: Debe incluir en el detalle las compras cuyo cashback acreditado fue 0.00 (truncamiento a cero, tope mensual ya alcanzado, o transacción inelegible), sin omitirlas del listado.
 
-- Ejemplo: El caso en que el cliente compra en un comercio sin tasa de cashback configurada durante el mes → la compra aparece en el detalle con cashback 0.00, no se excluye del listado.
+- Ejemplo: El caso en que el cliente realiza una compra cuyo cashback exacto trunca a cero → la compra aparece en el detalle con cashback 0.00, no se excluye del listado.
 
-**Decisión (confirmada explícitamente por el negocio):** no se distingue el motivo del 0.00 con un campo textual separado; el detalle solo muestra el valor final (0.00), sin desglosar la causa (sin tasa, truncamiento o tope).
+**Decisión (confirmada explícitamente por el negocio):** no se distingue el motivo del 0.00 con un campo textual separado; el detalle solo muestra el valor final (0.00), sin desglosar la causa (truncamiento, tope, o inelegibilidad).
+
+> **Nota de actualización:** el ejemplo original de esta regla era "comercio
+> sin tasa de cashback configurada". Ese motivo de 0.00 ya no existe —
+> `categorias-comerciante-y-elegibilidad.md` establece que todo comercio
+> tiene una tasa aplicable (mínimo 0.5%, categoría "Por defecto"). Los
+> motivos vigentes de un 0.00 son: truncamiento a cero, tope mensual
+> alcanzado, o transacción inelegible (esta última, nueva en esa feature).
+> La decisión de esta regla (no distinguir el motivo) sigue vigente y ahora
+> también cubre la inelegibilidad.
 
 ### Regla 3: Debe calcular el total de cashback del mes como la suma de los montos de cashback acreditados (ya truncados y limitados por el tope mensual) de todas las compras del mes, incluidas las de 0.00.
 
